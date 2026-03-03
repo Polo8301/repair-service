@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Ремонтная служба</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+        header { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        header h1 { margin: 0 0 15px 0; color: #333; }
+        .user-bar { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .user-bar a { text-decoration: none; color: #007bff; padding: 5px 10px; border-radius: 4px; }
+        .user-bar a:hover { background: #e7f1ff; }
+        .user-bar select { padding: 8px; border-radius: 4px; border: 1px solid #ddd; }
+        .user-bar button { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .user-bar button:hover { background: #0056b3; }
+        main { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; color: #555; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+        .btn { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-sm { padding: 5px 12px; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: #f8f9fa; font-weight: 600; color: #555; }
+        tr:hover { background: #f8f9fa; }
+        .status-new { background: #fff3cd !important; }
+        .status-assigned { background: #cce5ff !important; }
+        .status-in_progress { background: #d4edda !important; }
+        .status-done { background: #d1ecf1 !important; }
+        .status-canceled { background: #f8d7da !important; }
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+        .status-new .status-badge { background: #856404; color: #fff; }
+        .status-assigned .status-badge { background: #004085; color: #fff; }
+        .status-in_progress .status-badge { background: #155724; color: #fff; }
+        .status-done .status-badge { background: #0c5460; color: #fff; }
+        .status-canceled .status-badge { background: #721c24; color: #fff; }
+        .actions { display: flex; gap: 5px; flex-wrap: wrap; }
+        .actions form { display: inline; }
+        .empty { text-align: center; padding: 40px; color: #666; }
+        @media (max-width: 768px) {
+            table { font-size: 13px; }
+            th, td { padding: 8px 5px; }
+            .actions { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>🔧 Ремонтная служба</h1>
+    <div class="user-bar">
+        {% if current_user %}
+            <span>👤 <strong>{{ current_user.username }}</strong> ({{ current_user.role }})</span>
+            <a href="/?user_id={{ current_user.id }}">📋 Все заявки</a>
+            {% if current_user.role == 'dispatcher' %}
+                <a href="/dispatcher?user_id={{ current_user.id }}">👨‍💼 Диспетчер</a>
+            {% endif %}
+            {% if current_user.role == 'master' %}
+                <a href="/master?user_id={{ current_user.id }}">🔧 Мастер</a>
+            {% endif %}
+            <a href="/requests/new?user_id={{ current_user.id }}">➕ Новая заявка</a>
+            <a href="/logout">🚪 Выйти</a>
+        {% else %}
+            <span>Выберите пользователя:</span>
+            <form method="get" action="/" style="display:flex; gap:8px;">
+                <select name="user_id" required>
+                    <option value="">-- Выберите --</option>
+                    {% for u in users %}
+                        <option value="{{ u.id }}">{{ u.username }} ({{ u.role }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Войти</button>
+            </form>
+        {% endif %}
+    </div>
+</header>
+
+<main>
+    {% if page == "new_request" %}
+        <h2>➕ Новая заявка</h2>
+        <form method="post" action="/requests/new">
+            <div class="form-group">
+                <label for="client_name">Имя клиента *</label>
+                <input type="text" id="client_name" name="client_name" required maxlength="100" placeholder="Иван Иванов">
+            </div>
+            <div class="form-group">
+                <label for="phone">Телефон *</label>
+                <input type="tel" id="phone" name="phone" required maxlength="20" placeholder="+7 (999) 123-45-67">
+            </div>
+            <div class="form-group">
+                <label for="address">Адрес *</label>
+                <input type="text" id="address" name="address" required maxlength="200" placeholder="г. Москва, ул. Примерная, д. 1">
+            </div>
+            <div class="form-group">
+                <label for="problem_text">Описание проблемы *</label>
+                <textarea id="problem_text" name="problem_text" required maxlength="1000" placeholder="Не работает розетка на кухне..."></textarea>
+            </div>
+            <button type="submit" class="btn">Создать заявку</button>
+        </form>
+
+    {% elif page == "dispatcher" %}
+        <h2>👨‍💼 Панель диспетчера</h2>
+
+        <!-- Фильтр по статусу -->
+        <div style="margin-bottom: 15px;">
+            <strong>Фильтр:</strong>
+            <a href="/dispatcher?user_id={{ current_user.id }}">Все</a> |
+            <a href="/dispatcher?user_id={{ current_user.id }}&status=new">🟡 Новые</a> |
+            <a href="/dispatcher?user_id={{ current_user.id }}&status=assigned">🔵 Назначенные</a> |
+            <a href="/dispatcher?user_id={{ current_user.id }}&status=in_progress">🟢 В работе</a> |
+            <a href="/dispatcher?user_id={{ current_user.id }}&status=done">✅ Завершённые</a> |
+            <a href="/dispatcher?user_id={{ current_user.id }}&status=canceled">❌ Отменённые</a>
+        </div>
+
+        {% if requests %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Телефон</th>
+                    <th>Адрес</th>
+                    <th>Проблема</th>
+                    <th>Статус</th>
+                    <th>Мастер</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in requests %}
+                {% if not status_filter or r.status.value == status_filter %}
+                <tr class="status-{{ r.status.value }}">
+                    <td><strong>{{ r.id }}</strong></td>
+                    <td>{{ r.client_name }}</td>
+                    <td>{{ r.phone }}</td>
+                    <td>{{ r.address }}</td>
+                    <td title="{{ r.problem_text }}">{{ r.problem_text[:40] }}{% if r.problem_text|length > 40 %}...{% endif %}</td>
+                    <td><span class="status-badge">{{ r.status.value }}</span></td>
+                    <td>
+                        {% if r.assigned_to %}
+                            {% for u in users %}
+                                {% if u.id == r.assigned_to %}{{ u.username }}{% endif %}
+                            {% endfor %}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="actions">
+                        {% if r.status.value == 'new' %}
+                            <!-- Форма назначения мастера -->
+                            <form method="post" action="/requests/{{ r.id }}/assign" style="display:flex; gap:5px; align-items:center;">
+                                <select name="assigned_to" required style="padding:4px 8px; border-radius:4px; border:1px solid #ddd;">
+                                    <option value="">Выберите мастера</option>
+                                    {% for u in users %}
+                                        {% if u.role == 'master' %}
+                                            <option value="{{ u.id }}">{{ u.username }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-success">Назначить</button>
+                            </form>
+                        {% endif %}
+
+                        {% if r.status.value != 'done' and r.status.value != 'canceled' %}
+                            <form method="post" action="/requests/{{ r.id }}/cancel" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger">Отмена</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="empty">Заявок пока нет. <a href="/requests/new?user_id={{ current_user.id }}">Создать первую</a></p>
+        {% endif %}
+
+    {% elif page == "master" %}
+        <h2>🔧 Панель мастера</h2>
+        <p>Ваши назначенные заявки:</p>
+
+        {% if requests %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Адрес</th>
+                    <th>Проблема</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in requests %}
+                <tr class="status-{{ r.status.value }}">
+                    <td><strong>{{ r.id }}</strong></td>
+                    <td>{{ r.client_name }}<br><small>{{ r.phone }}</small></td>
+                    <td>{{ r.address }}</td>
+                    <td>{{ r.problem_text }}</td>
+                    <td><span class="status-badge">{{ r.status.value }}</span></td>
+                    <td class="actions">
+                        {% if r.status.value == 'assigned' %}
+                            <form method="post" action="/requests/{{ r.id }}/take">
+                                <button type="submit" class="btn btn-sm btn-warning">⚡ Взять в работу</button>
+                            </form>
+                        {% elif r.status.value == 'in_progress' %}
+                            <form method="post" action="/requests/{{ r.id }}/complete">
+                                <button type="submit" class="btn btn-sm btn-success">✅ Завершить</button>
+                            </form>
+                        {% else %}
+                            <span style="color:#666;">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="empty">У вас пока нет назначенных заявок.</p>
+        {% endif %}
+
+    {% else %}
+        <!-- Главная страница / список всех заявок -->
+        <h2>📋 Все заявки</h2>
+
+        {% if requests %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Телефон</th>
+                    <th>Статус</th>
+                    <th>Создана</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in requests %}
+                <tr class="status-{{ r.status.value }}">
+                    <td><strong>{{ r.id }}</strong></td>
+                    <td>{{ r.client_name }}</td>
+                    <td>{{ r.phone }}</td>
+                    <td><span class="status-badge">{{ r.status.value }}</span></td>
+                    <td>{{ r.created_at.strftime('%d.%m %H:%M') if r.created_at else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="empty">Заявок пока нет.</p>
+        {% endif %}
+
+        {% if current_user %}
+            <p style="margin-top:20px;">
+                <a href="/requests/new?user_id={{ current_user.id }}" class="btn">➕ Создать новую заявку</a>
+            </p>
+        {% endif %}
+    {% endif %}
+</main>
+</body>
+</html>
